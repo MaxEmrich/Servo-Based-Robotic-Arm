@@ -1,6 +1,8 @@
 #ifndef DEFS
 #define DEFS
 
+// Strcture, enum, and constant definitions
+
 #define NUM_ARM_SEGMENTS 3
 
 struct R3Point {
