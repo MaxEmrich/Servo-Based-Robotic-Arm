@@ -14,7 +14,7 @@
 
 // Function declarations
 
-struct Vector* newVec_FromPoint(struct R3Point* p1, struct R3Point* p2);    // make a new vector given two points in 3-space -- p1 is the tail, p2 is the head 
+struct Vector* newVec_FromPoints(struct R3Point* p1, struct R3Point* p2);    // make a new vector given two points in 3-space -- p1 is the tail, p2 is the head 
 
 struct Vector* newVec_Comps(float x, float y, float z);    // make a new vector with COMPONENTS x, y, and z 
 

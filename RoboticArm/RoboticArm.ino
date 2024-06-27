@@ -20,9 +20,7 @@ the vector L2, and P4 is the tail of L3. Assume also that the head of vector L1 
 to the tail of L2, and that the head of L2 is connected to the tail of L3. P5, then, 
 is where we want to place the end affector (the head of L3)
 - Process for FABRICK:
-  1) Make sure end point is within reach (make sure the goal point distance is
-  not greater than the max arm length)
-  2) Take 
+  
 */
 
 #include <stdlib.h>
@@ -37,18 +35,45 @@ is where we want to place the end affector (the head of L3)
 
 #include "defs.h"
 #include "funcs.h"
+#include "linked_list.h"
 
-extern int errno; // extern allows us to share errno variables to other files
+// extern int errno; // extern allows us to share errno variables to other files
 // errno is set to 0 by default
 
-// base servo determines orientation in 3d-space... adds z-dimension. 
-// base servo rotates around the y-axis s
+
+// -----------------------------------------------------
+// -----------------------------------------------------
+
+/*
+
+Declarations for:
+
+Servos,
+Linked list,
+Vectors
+
+*/
+
+// make some vectors to represent the arm segments
+struct Vector* baseVec = NULL;
+struct Vector* vec1 = NULL;
+struct Vector* vec2 = NULL;
+struct Vector* endVec = NULL;
+
+// BASE servo determines orientation in 3d-space... adds z-dimension. 
+// BASE servo rotates around the y-axis
 Servo servo_1;
 Servo servo_2;
 Servo servo_3;
+Servo servo_4;
 
-struct Vector* my_vector;
-struct Vector* my_unit_vector;
+
+// head and tail of a new doubly linked list 
+struct node* head; 
+struct node* tail; 
+
+// -----------------------------------------------------
+// -----------------------------------------------------
 
   // asssume all positions and rotations start at (0,0,0)
   // Define all 3d points by defining points RELATIVE to the (0,0,0) position of all points  
@@ -62,13 +87,49 @@ void setup() {
   servo_1.attach(3);
   servo_2.attach(4);
   servo_3.attach(5);
+  servo_4.attach(6);
+
+  // -----------------------------------------------------
+  // -----------------------------------------------------
 
   struct R3Point* goalPoint; // this is a POINTER to an instance of the R3point structure  
   goalPoint = malloc(sizeof(struct R3Point)); // allocate memory for this pointer to a struct
 
-  (*goalPoint).point_3d[0] = 3.0; // assign values to the point_3d array
+  (*goalPoint).point_3d[0] = 3.0; // assign values to the point_3d array for our goal point (the point we want to reach)
   (*goalPoint).point_3d[1] = 3.0;
   (*goalPoint).point_3d[2] = 3.0;
+
+  struct R3Point* basePoint;
+  basePoint = malloc(sizeof(struct R3Point));
+  
+  (*basePoint).point_3d[0] = 0.0; // assign base point of the arm to be the origin, (0,0,0)
+  (*basePoint).point_3d[1] = 0.0;
+  (*basePoint).point_3d[2] = 0.0;
+
+  // -----------------------------------------------------
+  // -----------------------------------------------------
+
+
+  // -----------------------------------------------------
+  // -----------------------------------------------------
+  // intialize the vectors we created with lengths, these are all COMPONENT vectors (their tail points are all at (0,0,0))
+
+  baseVec = newVec_Comps(0.0, BASE_VEC_LENGTH, 0.0); // all these vector are sticking straight up in the y-direction 
+  vec1 = newVec_Comps(0.0, VEC1_LENGTH, 0.0);
+  vec2 = newVec_Comps(0.0, VEC2_LENGTH, 0.0);
+  endVec = newVec_Comps(0.0, END_EFFECTOR_LENGTH, 0.0);
+
+  // create a linked list of "arms" and intialize it here: a "node" represents an arm segment
+  // intialize head and tail of the doubly-linked list to NULL
+  head = NULL;
+  tail = NULL;
+
+  insertAtHead(baseVec); // create AND insert node into the list, this list is accessible through the HEAD node
+  insertAtTail(vec1);
+  insertAtTail(vec2);
+  insertAtTail(endVec);
+  // ----------------------------------------------
+  // ----------------------------------------------
 
   delay(500);
 
@@ -79,10 +140,16 @@ void loop() {
   delay(100);
   // entry point - main loop logic 
   
+  // test if end effector is at the goal point (or within a few milimeters of it)
+  // ---
 
+
+ 
   // main program loop:
   // 1. find goal point
-  // 2. 
+  // 2. define an "end affector," which will be the top/end of our robotic arm
+  // 3. see if the tip is at that point, or within a range of that point 
+  // 4. we will define a robotic arm in the real-world as a doubly linked list of 3d vectors 
 
   delay(100);
 }
@@ -92,26 +159,66 @@ void loop() {
 // --------------------------------------------------------------------------------------------
 // --------------------------------------------------------------------------------------------
 
-struct node* getNewNode(struct Vector* vector, struct node* nextNode = NULL) {
-  struct node* newNode = malloc(sizeof(struct node));
-
-  if (newNode == NULL) { // if malloc didn't give us memory 
-    // Serial.println("ERROR: Could not get memory for a new node...");
-    // Serial.println(errno);
+int printList(struct node* head) {
+  if (head->next == NULL) {
+    Serial.println("List is empty");
+    return 0;
   }
 
-  if (nextNode == NULL) { // if no nextNode was given...
-    (*newNode).next = NULL;
+  struct node* current_node = head;
+
+  return 0;
+}
+
+struct node* getNewNode(struct Vector* vector) {
+  struct node* newNode = malloc(sizeof(struct node));
+
+  if (newNode == NULL) {
+    Serial.println("Error: Could not get memory for newNode...");
+    return -1;
+  }
+
+  if (newNode == NULL) { // if malloc didn't give us memory 
+    Serial.println("ERROR: Could not get memory for a new node...");
+    Serial.println(errno);
   }
 
   (*newNode).vector = vector;
+  (*newNode).next = NULL; // initialize both head and tail to NULL for every newly created node 
+  (*newNode).previous = NULL;
 
   return newNode;
 }
 
-struct Vector* myVector = malloc(sizeof(struct Vector));
+void insertAtHead(struct Vector* vector) { // create and insert a new node at the head of the list
+  struct node* newNode = getNewNode(vector);
 
-struct node* myNode = getNewNode(myVector);
+  if (newNode == NULL) {
+    Serial.println("Error: Could not get memory for newNode...");
+    return -1;
+  }
+
+  if (head == NULL) {
+    head = newNode; // set the head AND tail to be the new node if the list IS empty 
+    tail = newNode; 
+  } else { // if the head of the list is intialized, AKA: if the list is NOT empty
+    (*newNode).next = head;
+    (*head).previous = newNode;
+    head = newNode;
+  }
+}
+
+void insertAtTail(struct Vector* vector) {
+  struct node* newNode = getNewNode(vector);
+  if (head == NULL) {
+    head = newNode;
+    tail = newNode;
+  } else {
+    (*newNode).previous = tail;
+    (*tail).next = newNode;
+    tail = newNode;
+  }
+}
 
 // --------------------------------------------------------------------------------------------
 // --------------------------------------------------------------------------------------------
@@ -122,7 +229,7 @@ struct node* myNode = getNewNode(myVector);
 // --------------------------------------------------------------------------------------------
 // --------------------------------------------------------------------------------------------
 
-struct Vector* newVec_FromPoint(struct R3Point* p1, struct R3Point* p2) {    // make a new vector given two points in 3-space -- p1 is the tail, p2 is the head 
+struct Vector* newVec_FromPoints(struct R3Point* p1, struct R3Point* p2) {    // make a new vector given two points in 3-space -- p1 is the tail, p2 is the head 
   struct Vector* newVector = malloc(sizeof(struct Vector));
 
   // to make component vector, we use p2 - p1 = new vector

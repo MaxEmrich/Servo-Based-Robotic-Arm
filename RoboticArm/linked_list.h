@@ -8,17 +8,17 @@
 
 // MAKE A LINKED LIST OF VECTORS TO REPRESENT ARM SEGMENTS
 
-struct head {
-  int isHeadNode = 1; // sets isHeadNode to true 
-  struct node* first_node;
-};
-
 struct node {
   struct Vector* vector; 
+  struct node* previous;
   struct node* next; // pointer to the next node in the linked list
 }; 
 
-struct node* getNewNode(struct Vector* vector, struct node* nextNode = NULL);
+struct node* getNewNode(struct Vector* vector);
+void insertAtHead(struct Vector* vector); // create and insert a new node at the head of the list... 
+void insertAtTail(struct Vector* vector); // create and insert a new node at the tail of the list... 
+int printList(struct node* head); // prints all nodes in list from head to tail, param is the head of the list, returns status code 
+
 
 #endif // LINKED_LIST
 
