@@ -35,7 +35,6 @@ is where we want to place the end affector (the head of L3)
 
 #include "defs.h"
 #include "funcs.h"
-#include "linked_list.h"
 
 // extern int errno; // extern allows us to share errno variables to other files
 // errno is set to 0 by default
@@ -54,6 +53,13 @@ Vectors
 
 */
 
+#define BAUD_RATE 9600
+
+bool isAtGoal = false;
+struct R3Point* goalPoint;
+float goalDistance; // distance from the origin (0,0,0) to the point in space
+
+
 // make some vectors to represent the arm segments
 struct Vector* baseVec = NULL;
 struct Vector* vec1 = NULL;
@@ -67,10 +73,8 @@ Servo servo_2;
 Servo servo_3;
 Servo servo_4;
 
-
-// head and tail of a new doubly linked list 
-struct node* head; 
-struct node* tail; 
+struct Vector* backwards_arr[NUM_SEGMENTS];
+struct Vector* forwards_arr[NUM_SEGMENTS];
 
 // -----------------------------------------------------
 // -----------------------------------------------------
@@ -81,7 +85,7 @@ struct node* tail;
 
 void setup() {  
 
-  Serial.begin(9600);
+  Serial.begin(BAUD_RATE);
   delay(200);
 
   servo_1.attach(3);
@@ -92,12 +96,17 @@ void setup() {
   // -----------------------------------------------------
   // -----------------------------------------------------
 
-  struct R3Point* goalPoint; // this is a POINTER to an instance of the R3point structure  
+  // this is a POINTER to an instance of the R3point structure  
   goalPoint = malloc(sizeof(struct R3Point)); // allocate memory for this pointer to a struct
 
   (*goalPoint).point_3d[0] = 3.0; // assign values to the point_3d array for our goal point (the point we want to reach)
   (*goalPoint).point_3d[1] = 3.0;
   (*goalPoint).point_3d[2] = 3.0;
+
+  int x = goalPoint->point_3d[0];
+  int y = goalPoint->point_3d[1];
+  int z = goalPoint->point_3d[2];
+  goalDistance = sqrt((x*x)+(y*y)+(z*z));
 
   struct R3Point* basePoint;
   basePoint = malloc(sizeof(struct R3Point));
@@ -119,117 +128,93 @@ void setup() {
   vec2 = newVec_Comps(0.0, VEC2_LENGTH, 0.0);
   endVec = newVec_Comps(0.0, END_EFFECTOR_LENGTH, 0.0);
 
-  // create a linked list of "arms" and intialize it here: a "node" represents an arm segment
-  // intialize head and tail of the doubly-linked list to NULL
-  head = NULL;
-  tail = NULL;
+  baseVec->magnitude = getMag(baseVec); // set the magnitude of these vectors
+  vec1->magnitude = getMag(vec1);
+  vec2->magnitude = getMag(vec2);
+  endVec->magnitude = getMag(endVec);
 
-  insertAtHead(baseVec); // create AND insert node into the list, this list is accessible through the HEAD node
-  insertAtTail(vec1);
-  insertAtTail(vec2);
-  insertAtTail(endVec);
+  forwards_arr[0] = baseVec;
+  forwards_arr[1] = vec1;
+  forwards_arr[2] = vec2;
+  forwards_arr[3] = endVec;
+
   // ----------------------------------------------
   // ----------------------------------------------
 
-  delay(500);
-
-  Serial.println("Serial.begin with 9600 baud rate...");
+  delay(500); // delay to make sure the serial monitor is open
+  if (Serial) {
+    Serial.print("Serial.begin with ");  Serial.print(BAUD_RATE); Serial.println("baud rate...");
+  }
 }
+
+// MAIN LOOP ----------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------
+
 
 void loop() {
   delay(100);
   // entry point - main loop logic 
   
+  // test if the goal point is within the range of the arm
+  float sum_of_mags;
+  for (int i = 0; i < NUM_SEGMENTS; i++) {
+    sum_of_mags = sum_of_mags + forwards_arr[i]->magnitude;
+  }
+  if (goalDistance > sum_of_mags) {
+    Serial.println("The goal point is out of range of the arm!");
+    exit(-1);
+  }
+
   // test if end effector is at the goal point (or within a few milimeters of it)
-  // ---
+  for (int i = 0; i < 3; i++) { 
+    if ((goalPoint->point_3d[i] - 1.0) < (endVec->vectorComponents[i]) < (goalPoint->point_3d[i] + 1.0)) { // check if the end effector in a very close RANGE of the goal point 
+      continue;
+    } else {
+      isAtGoal = false;
+      break;
+    }
+    isAtGoal = true;
+  }
+  if (isAtGoal) {
+    delay(300);
+    Serial.println("REACHED GOAL POINT!");
+    delay(300);
+    exit(0);
+  } 
 
+  // REVERSE-Reaching Step
+  // -----------------------------
+  // 1. Make END_VEC' (END_VEC prime), make vector from goal point to vec2's head and store it in our backwards_array[3]
+  backwards_arr[3] = newVec_FromPoints(goalPoint, forwards_arr[3]->headPoint);
+  backwards_arr[3] = makeUnitVec(backwards_arr[3]); // make our vector into a unit vector and multiply it by its original length 
+  scaleVec(backwards_arr[3], BASE_VEC_LENGTH);
+  // 2. Make VEC_2', make a vector, where its head is vec1's head, and its tail is the head of our new vector (stored in backwards_arr[3]), and store it in backwards_arr[2]
+  backwards_arr[2] = newVec_FromPoints(backwards_arr[3]->headPoint, forwards_arr[2]->headPoint);
+  backwards_arr[2] = makeUnitVec(backwards_arr[2]);
+  scaleVec(backwards_arr[2], VEC2_LENGTH);
+  // 3. Make VEC_1', make a vector, where its head is the tail of VEC_2', and its tail is the original VEC_1's head
+  backwards_arr[1] = newVec_FromPoints(forwards_arr[1]->headPoint, backwards_arr[2]->headPoint);
+  backwards_arr[2] = makeUnitVec(backwards_arr[1]);
+  scaleVec(backwards_arr[1], VEC1_LENGTH);
+  // No need to make a BASE_VEC' because the servo associated with that vector will be used for rotation into three dimensions
 
- 
-  // main program loop:
-  // 1. find goal point
-  // 2. define an "end affector," which will be the top/end of our robotic arm
-  // 3. see if the tip is at that point, or within a range of that point 
-  // 4. we will define a robotic arm in the real-world as a doubly linked list of 3d vectors 
+  // FORWARDS-Reaching Step
+  // -----------------------------
+  // 1. 
 
   delay(100);
 }
 
-
-// LINKED LIST --------------------------------------------------------------------------------
 // --------------------------------------------------------------------------------------------
 // --------------------------------------------------------------------------------------------
-
-int printList(struct node* head) {
-  if (head->next == NULL) {
-    Serial.println("List is empty");
-    return 0;
-  }
-
-  struct node* current_node = head;
-
-  return 0;
-}
-
-struct node* getNewNode(struct Vector* vector) {
-  struct node* newNode = malloc(sizeof(struct node));
-
-  if (newNode == NULL) {
-    Serial.println("Error: Could not get memory for newNode...");
-    return -1;
-  }
-
-  if (newNode == NULL) { // if malloc didn't give us memory 
-    Serial.println("ERROR: Could not get memory for a new node...");
-    Serial.println(errno);
-  }
-
-  (*newNode).vector = vector;
-  (*newNode).next = NULL; // initialize both head and tail to NULL for every newly created node 
-  (*newNode).previous = NULL;
-
-  return newNode;
-}
-
-void insertAtHead(struct Vector* vector) { // create and insert a new node at the head of the list
-  struct node* newNode = getNewNode(vector);
-
-  if (newNode == NULL) {
-    Serial.println("Error: Could not get memory for newNode...");
-    return -1;
-  }
-
-  if (head == NULL) {
-    head = newNode; // set the head AND tail to be the new node if the list IS empty 
-    tail = newNode; 
-  } else { // if the head of the list is intialized, AKA: if the list is NOT empty
-    (*newNode).next = head;
-    (*head).previous = newNode;
-    head = newNode;
-  }
-}
-
-void insertAtTail(struct Vector* vector) {
-  struct node* newNode = getNewNode(vector);
-  if (head == NULL) {
-    head = newNode;
-    tail = newNode;
-  } else {
-    (*newNode).previous = tail;
-    (*tail).next = newNode;
-    tail = newNode;
-  }
-}
-
-// --------------------------------------------------------------------------------------------
-// --------------------------------------------------------------------------------------------
-
 
 
 // VECTOR CREATION  --------------------------------------------------------------------------- 
 // --------------------------------------------------------------------------------------------
 // --------------------------------------------------------------------------------------------
 
-struct Vector* newVec_FromPoints(struct R3Point* p1, struct R3Point* p2) {    // make a new vector given two points in 3-space -- p1 is the tail, p2 is the head 
+struct Vector* newVec_FromPoints(struct R3Point* p1, struct R3Point* p2) {  // make a new vector given two points in 3-space -- p1 is the tail, p2 is the head 
   struct Vector* newVector = malloc(sizeof(struct Vector));
 
   // to make component vector, we use p2 - p1 = new vector
@@ -242,10 +227,14 @@ struct Vector* newVec_FromPoints(struct R3Point* p1, struct R3Point* p2) {    //
   (*newVector).vectorComponents[1] = y_comp;
   (*newVector).vectorComponents[2] = z_comp;
 
+  (*newVector).headPoint->point_3d[0]= x_comp; 
+  (*newVector).headPoint->point_3d[1] = y_comp;
+  (*newVector).headPoint->point_3d[2] = z_comp;
+
   // error checking....
-  assert((*newVector).tailPoint.point_3d[0] == 0.0);
-  assert((*newVector).tailPoint.point_3d[1] == 0.0);
-  assert((*newVector).tailPoint.point_3d[2] == 0.0);
+  assert((*newVector).tailPoint->point_3d[0] == 0.0);
+  assert((*newVector).tailPoint->point_3d[1] == 0.0);
+  assert((*newVector).tailPoint->point_3d[2] == 0.0);
     
   return newVector;
 }
@@ -257,13 +246,13 @@ struct Vector* newVec_Comps(float x, float y, float z) {    // make a new vector
   (*newVector).vectorComponents[2] = z;
 
   // establish head and tail R3 points for checking if vector is in component form...
-  (*newVector).headPoint.point_3d[0] = x;
-  (*newVector).headPoint.point_3d[1] = y;
-  (*newVector).headPoint.point_3d[2] = z;
+  (*newVector).headPoint->point_3d[0] = x;
+  (*newVector).headPoint->point_3d[1] = y;
+  (*newVector).headPoint->point_3d[2] = z;
   
-  (*newVector).tailPoint.point_3d[0] = 0.0; // set tail point as origin 
-  (*newVector).tailPoint.point_3d[1] = 0.0;
-  (*newVector).tailPoint.point_3d[2] = 0.0;
+  (*newVector).tailPoint->point_3d[0] = 0.0; // set tail point as origin 
+  (*newVector).tailPoint->point_3d[1] = 0.0;
+  (*newVector).tailPoint->point_3d[2] = 0.0;
   // ------------------------------------------------
 
   return newVector;
@@ -277,6 +266,15 @@ struct Vector* newVec_Comps(float x, float y, float z) {    // make a new vector
 // OPERATIONS ON VECTORS ----------------------------------------------------------------------
 // --------------------------------------------------------------------------------------------
 // --------------------------------------------------------------------------------------------
+
+void scaleVec(struct Vector* vector, float scale_val) {
+  assert(scale_val != 0.0); 
+
+  (*vector).vectorComponents[0] = ((*vector).vectorComponents[0]) * (scale_val); // scale components by scale value
+  (*vector).vectorComponents[1] = ((*vector).vectorComponents[1]) * (scale_val);
+  (*vector).vectorComponents[2] = ((*vector).vectorComponents[2]) * (scale_val);
+
+}
 
 float getMag(struct Vector* vector) { // returns the magnitude of the passed in vector
   float x_val = (*vector).vectorComponents[0];

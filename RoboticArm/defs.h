@@ -3,7 +3,7 @@
 
 // Strcture, enum, and constant definitions 
 
-#define NUM_ARM_SEGMENTS 3
+#define NUM_SEGMENTS 4
 
 /*
 
@@ -24,15 +24,15 @@ struct R3Point {
 };
 
 struct Vector {
-  R3Point tailPoint;
-  R3Point headPoint;
+  struct R3Point* tailPoint;
+  struct R3Point* headPoint;
   float magnitude = 0.0;
   float vectorComponents[3];
 };
 
 // all vectors should be in component form when being used for the FABRIK calculations
 
-const int num_joints = 4;
+const int NUM_JOINTS = 4;
 
 enum Joints {
   BASE_JOINT = 1, // start enumeration at 1, bottom joint is 2, middle joint is 3, top joint is 4
