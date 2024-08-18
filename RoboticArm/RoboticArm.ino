@@ -201,7 +201,10 @@ void loop() {
 
   // FORWARDS-Reaching Step
   // -----------------------------
-  // 1. 
+  // We are now reversing the direction, so the head and tails of the vectors are reversed
+  // 1. Make VEC_1'' (VEC_1 prime prime). Head: VEC_1' head. Tail: Start point, AKA (0,0,0) 
+  forwards_arr[0]
+  
 
   delay(100);
 }
