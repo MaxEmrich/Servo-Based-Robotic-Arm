@@ -181,7 +181,7 @@ void loop() {
     Serial.println("REACHED GOAL POINT!");
     delay(300);
     exit(0);
-  } 
+  }  
 
   // REVERSE-Reaching Step
   // -----------------------------
@@ -203,7 +203,11 @@ void loop() {
   // -----------------------------
   // We are now reversing the direction, so the head and tails of the vectors are reversed
   // 1. Make VEC_1'' (VEC_1 prime prime). Head: VEC_1' head. Tail: Start point, AKA (0,0,0) 
-  forwards_arr[0]
+  // Note: forwards_arr[0] is the first servo in the forwards-reaching process, and it is set, by default, as baseVec
+  forwards_arr[0] = newVec_FromPoints(baseVec, backwards_arr[1]->tailPoint);
+  forwards_arr[0] = makeUnitVec(forwards_arr[0]);
+  scaleVec(forwards_arr[0], BASE_VEC_LENGTH);   
+  // 2. Make VEC_2'' (VEC_2 prime prime)
   
 
   delay(100);
