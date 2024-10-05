@@ -73,8 +73,8 @@ Servo servo_2;
 Servo servo_3;
 Servo servo_4;
 
-struct Vector* backwards_arr[NUM_SEGMENTS];
-struct Vector* forwards_arr[NUM_SEGMENTS];
+struct Vector* backwards_vecs[NUM_SEGMENTS];
+struct Vector* forwards_vecs[NUM_SEGMENTS];
 
 // -----------------------------------------------------
 // -----------------------------------------------------
@@ -133,10 +133,10 @@ void setup() {
   vec2->magnitude = getMag(vec2);
   endVec->magnitude = getMag(endVec);
 
-  forwards_arr[0] = baseVec;
-  forwards_arr[1] = vec1;
-  forwards_arr[2] = vec2;
-  forwards_arr[3] = endVec;
+  forwards_vecs[0] = baseVec;
+  forwards_vecs[1] = vec1;
+  forwards_vecs[2] = vec2;
+  forwards_vecs[3] = endVec;
 
   // ----------------------------------------------
   // ----------------------------------------------
@@ -159,7 +159,7 @@ void loop() {
   // test if the goal point is within the range of the arm
   float sum_of_mags;
   for (int i = 0; i < NUM_SEGMENTS; i++) {
-    sum_of_mags = sum_of_mags + forwards_arr[i]->magnitude;
+    sum_of_mags = sum_of_mags + forwards_vecs[i]->magnitude;
   }
   if (goalDistance > sum_of_mags) {
     Serial.println("The goal point is out of range of the arm!");
@@ -185,29 +185,34 @@ void loop() {
 
   // REVERSE-Reaching Step
   // -----------------------------
-  // 1. Make END_VEC' (END_VEC prime), make vector from goal point to vec2's head and store it in our backwards_array[3]
-  backwards_arr[3] = newVec_FromPoints(goalPoint, forwards_arr[3]->headPoint);
-  backwards_arr[3] = makeUnitVec(backwards_arr[3]); // make our vector into a unit vector and multiply it by its original length 
-  scaleVec(backwards_arr[3], BASE_VEC_LENGTH);
-  // 2. Make VEC_2', make a vector, where its head is vec1's head, and its tail is the head of our new vector (stored in backwards_arr[3]), and store it in backwards_arr[2]
-  backwards_arr[2] = newVec_FromPoints(backwards_arr[3]->headPoint, forwards_arr[2]->headPoint);
-  backwards_arr[2] = makeUnitVec(backwards_arr[2]);
-  scaleVec(backwards_arr[2], VEC2_LENGTH);
+  // 1. Make END_VEC' (END_VEC prime), make vector from goal point to vec2's head and store it in our backwards_vecsay[3]
+  backwards_vecs[3] = newVec_FromPoints(goalPoint, forwards_vecs[3]->headPoint);
+  backwards_vecs[3] = makeUnitVec(backwards_vecs[3]); // make our vector into a unit vector and multiply it by its original length 
+  scaleVec(backwards_vecs[3], BASE_VEC_LENGTH);
+  // 2. Make VEC_2', make a vector, where its head is vec1's head, and its tail is the head of our new vector (stored in backwards_vecs[3]), and store it in backwards_vecs[2]
+  backwards_vecs[2] = newVec_FromPoints(backwards_vecs[3]->headPoint, forwards_vecs[2]->headPoint);
+  backwards_vecs[2] = makeUnitVec(backwards_vecs[2]);
+  scaleVec(backwards_vecs[2], VEC2_LENGTH);
   // 3. Make VEC_1', make a vector, where its head is the tail of VEC_2', and its tail is the original VEC_1's head
-  backwards_arr[1] = newVec_FromPoints(forwards_arr[1]->headPoint, backwards_arr[2]->headPoint);
-  backwards_arr[2] = makeUnitVec(backwards_arr[1]);
-  scaleVec(backwards_arr[1], VEC1_LENGTH);
+  backwards_vecs[1] = newVec_FromPoints(forwards_vecs[1]->headPoint, backwards_vecs[2]->headPoint);
+  backwards_vecs[2] = makeUnitVec(backwards_vecs[1]);
+  scaleVec(backwards_vecs[1], VEC1_LENGTH);
   // No need to make a BASE_VEC' because the servo associated with that vector will be used for rotation into three dimensions
 
   // FORWARDS-Reaching Step
   // -----------------------------
   // We are now reversing the direction, so the head and tails of the vectors are reversed
+<<<<<<< HEAD
   // 1. Make VEC_1'' (VEC_1 prime prime). Head: VEC_1' head. Tail: Start point, AKA (0,0,0) 
   // Note: forwards_arr[0] is the first servo in the forwards-reaching process, and it is set, by default, as baseVec
   forwards_arr[0] = newVec_FromPoints(baseVec, backwards_arr[1]->tailPoint);
   forwards_arr[0] = makeUnitVec(forwards_arr[0]);
   scaleVec(forwards_arr[0], BASE_VEC_LENGTH);   
   // 2. Make VEC_2'' (VEC_2 prime prime)
+=======
+  // 1. Make VEC_1'' (VEC_1 prime prime). Head: VEC_1' head (found in the backwards_vecs). Tail: Start point, AKA (0,0,0) 
+  forwards_vecs[0] = newVec_FromPoints(basePoint, backwards_vecs[])
+>>>>>>> d73fdf605e5008035d1630c7f845f45ea0814266
   
 
   delay(100);
