@@ -147,6 +147,14 @@ void setup() {
   }
 }
 
+void updateVector(struct Vector* dest, struct R3Point* from, struct R3Point* to, float length) {
+    struct Vector* tempVec = newVec_FromPoints(from, to);
+    tempVec = makeUnitVec(tempVec);
+    scaleVec(tempVec, length);
+    *dest = *tempVec;  // Assign the new vector to the destination
+    free(tempVec);  // Clean up temporary vector
+}
+
 // MAIN LOOP ----------------------------------------------------------------------------------
 // --------------------------------------------------------------------------------------------
 // --------------------------------------------------------------------------------------------
@@ -168,7 +176,7 @@ void loop() {
 
   // test if end effector is at the goal point (or within a few milimeters of it)
   for (int i = 0; i < 3; i++) { 
-    if ((goalPoint->point_3d[i] - 1.0) < (endVec->vectorComponents[i]) < (goalPoint->point_3d[i] + 1.0)) { // check if the end effector in a very close RANGE of the goal point 
+    if ((goalPoint->point_3d[i] - 1.0) < (endVec->vectorComponents[i]) < (goalPoint->point_3d[i] + 1.0)) { // check if the end effector is within a very close RANGE of the goal point 
       continue;
     } else {
       isAtGoal = false;
@@ -183,42 +191,17 @@ void loop() {
     exit(0);
   }  
 
-  // REVERSE-Reaching Step
-  // -----------------------------
-  // 1. Make END_VEC' (END_VEC prime), make vector from goal point to vec2's head and store it in our backwards_vecsay[3]
-  backwards_vecs[3] = newVec_FromPoints(goalPoint, forwards_vecs[3]->headPoint);
-  backwards_vecs[3] = makeUnitVec(backwards_vecs[3]); // make our vector into a unit vector and multiply it by its original length 
-  scaleVec(backwards_vecs[3], END_EFFECTOR_LENGTH);
-  // 2. Make VEC_2', make a vector, where its head is vec1's head, and its tail is the head of our new vector (stored in backwards_vecs[3]), and store it in backwards_vecs[2]
-  backwards_vecs[2] = newVec_FromPoints(backwards_vecs[3]->headPoint, forwards_vecs[2]->headPoint);
-  backwards_vecs[2] = makeUnitVec(backwards_vecs[2]);
-  scaleVec(backwards_vecs[2], VEC2_LENGTH);
-  // 3. Make VEC_1', make a vector, where its head is the tail of VEC_2', and its tail is the original VEC_1's head
-  backwards_vecs[1] = newVec_FromPoints(forwards_vecs[1]->headPoint, backwards_vecs[2]->headPoint);
-  backwards_vecs[1] = makeUnitVec(backwards_vecs[1]);
-  scaleVec(backwards_vecs[1], VEC1_LENGTH);
+   // ------------------- Backwards-Reaching Step -------------------
+    updateVector(backwards_vecs[3], goalPoint, forwards_vecs[3]->headPoint, END_EFFECTOR_LENGTH);
+    updateVector(backwards_vecs[2], backwards_vecs[3]->headPoint, forwards_vecs[2]->headPoint, VEC2_LENGTH);
+    updateVector(backwards_vecs[1], forwards_vecs[1]->headPoint, backwards_vecs[2]->headPoint, VEC1_LENGTH);
 
+    // ------------------- Forwards-Reaching Step -------------------
+    updateVector(forwards_vecs[1], baseVec->headPoint, backwards_vecs[1]->tailPoint, VEC1_LENGTH);
+    updateVector(forwards_vecs[2], forwards_vecs[1]->headPoint, backwards_vecs[1]->headPoint, VEC2_LENGTH);
+    updateVector(forwards_vecs[3], forwards_vecs[2]->headPoint, goalPoint, END_EFFECTOR_LENGTH);
 
-  // No need to make a BASE_VEC' because the servo associated with that vector will be used for rotation into three dimensions
-
-
-  // FORWARDS-Reaching Step
-  // -----------------------------
-  // We are now reversing the direction, so the head and tails of the vectors are reversed
-
-  // 1. Make VEC_1'' (VEC_1 prime prime). Head: VEC_1' head. Tail: Start point, AKA (0,0,0) 
-  // Note: forwards_vecs[0] is the first servo in the forwards-reaching process, and it is set, by default, as baseVec
-  forwards_vecs[1] = newVec_FromPoints(baseVec, backwards_vecs[1]->tailPoint);
-  forwards_vecs[1] = makeUnitVec(forwards_vecs[1]);
-  scaleVec(forwards_vecs[1], VEC1_LENGTH);
-
-  forwards_vecs[2] = makeVec_FromPoints(forwards_vecs[1]->head, backwards_vecs[1]->head);
-  forwards_vecs[2] = makeUnitVec(forwards_vecs[2]);
-  scaleVec(forwards_vecs[2], VEC2_LENGTH);
-
-  forwards_vecs[3] = makeVec_FromPoints(forwards_vecs[2]->head, goalPoint);
-  forwards_vecs[3] = makeUnitVec(forwards_vecs[3]);
-  scaleVec(forwards_vecs[3], END_EFFECTOR_LENGTH);
+    delay(100);  // Optional delay for stability
 
 
   delay(100);
