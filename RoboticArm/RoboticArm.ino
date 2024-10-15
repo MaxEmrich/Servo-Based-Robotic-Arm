@@ -313,9 +313,11 @@ int rotate_servo(float num_degrees, Servo servo, float min_degrees = 0.0, float 
 
 void printVectorComps(struct Vector* vector) {
   char xyz[3] = {'x', 'y', 'z'};
-  for (int i = 0; i < 3; i++) { // i < 3 for x,y,z dimensions 
-    Serial.println("The " + xyz[i] + " component for the head of this vector is:");
-    Serial.println(vector->headPoint[i]);
+  char buff[64];
+  for (int i = 0; i < 3; i++) { // i < 3 for x,y,z dimensions
+    sprintf(buff, "The %c component for the head of this vector is:", xyz[i]);
+    Serial.println(buff);
+    // Serial.println(vector->headPoint[i]);
   } 
 }
 
