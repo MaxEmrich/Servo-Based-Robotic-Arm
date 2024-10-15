@@ -36,26 +36,13 @@ is where we want to place the end affector (the head of L3)
 #include "defs.h"
 #include "funcs.h"
 
+#define BAUD_RATE 9600
+
 // extern int errno; // extern allows us to share errno variables to other files
 // errno is set to 0 by default
 
 
-// -----------------------------------------------------
-// -----------------------------------------------------
-
-/*
-
-Declarations for:
-
-Servos,
-Linked list,
-Vectors
-
-*/
-
-#define BAUD_RATE 9600
-
-bool isAtGoal = false;
+bool atGoal = false;
 struct R3Point* goalPoint;
 float goalDistance; // distance from the origin (0,0,0) to the point in space
 
@@ -147,61 +134,26 @@ void setup() {
   }
 }
 
-void updateVector(struct Vector* dest, struct R3Point* from, struct R3Point* to, float length) {
-    struct Vector* tempVec = newVec_FromPoints(from, to);
-    tempVec = makeUnitVec(tempVec);
-    scaleVec(tempVec, length);
-    *dest = *tempVec;  // Assign the new vector to the destination
-    free(tempVec);  // Clean up temporary vector
-}
-
 // MAIN LOOP ----------------------------------------------------------------------------------
 // --------------------------------------------------------------------------------------------
 // --------------------------------------------------------------------------------------------
 
-
 void loop() {
-  delay(100);
-  // entry point - main loop logic 
-  
-  // test if the goal point is within the range of the arm
-  float sum_of_mags;
-  for (int i = 0; i < NUM_SEGMENTS; i++) {
-    sum_of_mags = sum_of_mags + forwards_vecs[i]->magnitude;
-  }
-  if (goalDistance > sum_of_mags) {
-    Serial.println("The goal point is out of range of the arm!");
-    exit(-1);
-  }
+  delay(100); 
 
-  // test if end effector is at the goal point (or within a few milimeters of it)
-  for (int i = 0; i < 3; i++) { 
-    if ((goalPoint->point_3d[i] - 1.0) < (endVec->vectorComponents[i]) < (goalPoint->point_3d[i] + 1.0)) { // check if the end effector is within a very close RANGE of the goal point 
-      continue;
-    } else {
-      isAtGoal = false;
-      break;
-    }
-    isAtGoal = true;
-  }
-  if (isAtGoal) {
-    delay(300);
-    Serial.println("REACHED GOAL POINT!");
-    delay(300);
-    exit(0);
-  }  
+  isWithinRange();  
+  isAtGoal();
 
-   // ------------------- Backwards-Reaching Step -------------------
-    updateVector(backwards_vecs[3], goalPoint, forwards_vecs[3]->headPoint, END_EFFECTOR_LENGTH);
-    updateVector(backwards_vecs[2], backwards_vecs[3]->headPoint, forwards_vecs[2]->headPoint, VEC2_LENGTH);
-    updateVector(backwards_vecs[1], forwards_vecs[1]->headPoint, backwards_vecs[2]->headPoint, VEC1_LENGTH);
+  // ------------------- Backwards-Reaching Step -------------------
+  updateVector(backwards_vecs[3], goalPoint, forwards_vecs[3]->headPoint, END_EFFECTOR_LENGTH);
+  updateVector(backwards_vecs[2], backwards_vecs[3]->headPoint, forwards_vecs[2]->headPoint, VEC2_LENGTH);
+  updateVector(backwards_vecs[1], forwards_vecs[1]->headPoint, backwards_vecs[2]->headPoint, VEC1_LENGTH);
 
-    // ------------------- Forwards-Reaching Step -------------------
-    updateVector(forwards_vecs[1], baseVec->headPoint, backwards_vecs[1]->tailPoint, VEC1_LENGTH);
-    updateVector(forwards_vecs[2], forwards_vecs[1]->headPoint, backwards_vecs[1]->headPoint, VEC2_LENGTH);
-    updateVector(forwards_vecs[3], forwards_vecs[2]->headPoint, goalPoint, END_EFFECTOR_LENGTH);
+  // ------------------- Forwards-Reaching Step -------------------
+  updateVector(forwards_vecs[1], baseVec->headPoint, backwards_vecs[1]->tailPoint, VEC1_LENGTH);
+  updateVector(forwards_vecs[2], forwards_vecs[1]->headPoint, backwards_vecs[1]->headPoint, VEC2_LENGTH);
+  updateVector(forwards_vecs[3], forwards_vecs[2]->headPoint, goalPoint, END_EFFECTOR_LENGTH);
 
-    delay(100);  // Optional delay for stability
 
 
   delay(100);
@@ -268,6 +220,14 @@ struct Vector* newVec_Comps(float x, float y, float z) {    // make a new vector
 // --------------------------------------------------------------------------------------------
 // --------------------------------------------------------------------------------------------
 
+void updateVector(struct Vector* dest, struct R3Point* from, struct R3Point* to, float length) {
+    struct Vector* tempVec = newVec_FromPoints(from, to);
+    tempVec = makeUnitVec(tempVec);
+    scaleVec(tempVec, length);
+    *dest = *tempVec;  // Assign the new vector to the destination
+    free(tempVec);  // Clean up temporary vector
+}
+
 void scaleVec(struct Vector* vector, float scale_val) {
   assert(scale_val != 0.0); 
 
@@ -287,7 +247,6 @@ float getMag(struct Vector* vector) { // returns the magnitude of the passed in 
 }
 
 struct Vector* makeUnitVec(struct Vector* vector) {
-
   struct Vector* unitVector = malloc(sizeof(struct Vector)); 
   float vectorMag = getMag(vector);
 
@@ -307,7 +266,7 @@ struct Vector* makeUnitVec(struct Vector* vector) {
 }  
 
 float getYComp(float mag, float angle) { // get the y component of the vector (in an xy plane)
-  return mag * sin(angle * (M_PI/180.0)); // accepts radians, so we need to convert the angle to radians 
+  return mag * sin(angle * (M_PI/180.0)); // sin and cos only accepts radians, so we need to convert the angle to degrees 
 }
 
 float getXComp(float mag, float angle) { // get the y component of the vector (in an xy plane)
@@ -343,7 +302,46 @@ int rotate_servo(float num_degrees, Servo servo, float min_degrees = 0.0, float 
   return 0;
 }
 
+// --------------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------
 
+
+
+// OTHER OPERATIONS ---------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------
+
+void isWithinRange() {
+  float sum_of_mags;
+  for (int i = 0; i < NUM_SEGMENTS; i++) {
+    sum_of_mags = sum_of_mags + forwards_vecs[i]->magnitude;
+  }
+  if (goalDistance > sum_of_mags) {
+    Serial.println("The goal point is OUT OF RANGE of the arm!");
+    exit(-1);
+  } else {
+    Serial.println("The goal point seems to be in range...");
+  }
+}
+
+void isAtGoal() {
+  // test if end effector is at the goal point (or within a few milimeters of it)
+  for (int i = 0; i < 3; i++) { 
+    if ((goalPoint->point_3d[i] - 1.0) < (endVec->vectorComponents[i]) ||
+        (goalPoint->point_3d[i] - 1.0) < (goalPoint->point_3d[i] + 1.0)) { // check if the end effector is within a very close RANGE of the goal point 
+      continue;
+    } else {
+      atGoal = false;
+      break;
+    }
+    atGoal = true;
+  }
+  if (atGoal) {
+    delay(300);
+    Serial.println("REACHED GOAL POINT!");
+    delay(300);
+  }
+}
 
 // --------------------------------------------------------------------------------------------
 // --------------------------------------------------------------------------------------------
